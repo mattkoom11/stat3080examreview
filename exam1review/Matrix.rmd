@@ -1,0 +1,124 @@
+Matrixes
+
+rbind()
+```{r}
+A = matrix(
+  c(1, 2, 3, 4, 5, 6, 7, 8, 9), 
+  nrow = 3,             
+  ncol = 3,             
+  byrow = TRUE          
+)
+cat("The 3x3 matrix:\n")
+print(A)
+
+B = matrix(
+  c(10, 11, 12),
+  nrow = 1,
+  ncol = 3
+)
+cat("The 1x3 matrix:\n")
+print(B)
+
+C = rbind(A, B)
+
+cat("After concatenation of a row:\n")
+print(C)
+```
+
+cbind()
+```{r}
+A = matrix(
+  c(1, 2, 3, 4, 5, 6, 7, 8, 9), 
+  nrow = 3,             
+  ncol = 3,             
+  byrow = TRUE          
+)
+cat("The 3x3 matrix:\n")
+print(A)
+
+B = matrix(
+  c(10, 11, 12),
+  nrow = 3,
+  ncol = 1,
+  byrow = TRUE
+)
+cat("The 3x1 matrix:\n")
+print(B)
+
+C = cbind(A, B)
+
+cat("After concatenation of a column:\n")
+print(C)
+```
+
+adding rows
+```{r}
+number <- matrix(
+  c(1, 2, 3, 4, 5, 6, 7, 8, 9), 
+  nrow = 3,             
+  ncol = 3,             
+  byrow = TRUE          
+)
+cat("Before inserting a new row:\n")
+print(number)
+
+new_row <- c(10, 11, 12)
+
+A <- rbind(number[1, ], new_row, number[-1, ])
+
+cat("\nAfter inserting a new row:\n")
+print(A)
+```
+
+adding column
+```{r}
+number <- matrix(
+  c(1, 2, 3, 4, 5, 6, 7, 8, 9), 
+  nrow = 3,             
+  ncol = 3,             
+  byrow = TRUE          
+)
+cat("Before adding a new column:\n")
+print(number)
+
+new_column <- c(10, 11, 12)
+
+number <- cbind(number, new_column)
+
+cat("\nAfter adding a new column:\n")
+print(number)
+```
+
+row deletion
+```{r}
+A = matrix(
+  c(1, 2, 3, 4, 5, 6, 7, 8, 9), 
+  nrow = 3,             
+  ncol = 3,             
+  byrow = TRUE          
+)
+cat("Before deleting the 2nd row\n")
+print(A)
+
+A = A[-2, ]
+
+cat("After deleted the 2nd row\n")
+print(A)
+```
+
+column deletion
+```{r}
+A = matrix(
+  c(1, 2, 3, 4, 5, 6, 7, 8, 9), 
+  nrow = 3,             
+  ncol = 3,             
+  byrow = TRUE          
+)
+cat("Before deleting the 2nd column\n")
+print(A)
+
+A = A[, -2]
+
+cat("After deleted the 2nd column\n")
+print(A)
+```
