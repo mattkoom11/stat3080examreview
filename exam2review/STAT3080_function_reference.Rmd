@@ -1,0 +1,649 @@
+---
+title: "STAT 3080 — Function Reference & Examples"
+author: "Study Guide"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+```
+
+---
+
+# Part 1: `dplyr` — Row Verbs
+
+## `filter()` — Keep rows matching a condition
+
+```{r}
+# Comma between conditions = AND (&)
+flights <- nycflights13::flights
+
+flights |>
+  filter(month == 1, day == 1) |>
+  slice_head(n = 3)
+
+# OR condition
+flights |>
+  filter(month == 1 | month == 2) |>
+  slice_head(n = 3)
+```
+
+## `between()` — Shorthand for range filtering
+
+```{r}
+# between(x, a, b) is equivalent to x >= a & x <= b
+flights |>
+  filter(between(dep_delay, -5, 5)) |>
+  slice_head(n = 3)
+```
+
+## `arrange()` — Sort rows
+
+```{r}
+# Default: ascending. desc() for descending.
+flights |>
+  arrange(desc(dep_delay)) |>
+  slice_head(n = 3)
+
+# Multiple columns: sorts by first, breaks ties with second
+flights |>
+  arrange(month, desc(dep_delay)) |>
+  slice_head(n = 3)
+```
+
+## `slice()` — Select rows by index
+
+```{r}
+# Pick specific row numbers (can repeat for sampling with replacement!)
+flights |>
+  slice(c(1, 3, 3, 100)) |>
+  select(month, day, dep_delay)
+```
+
+## `slice_head()` / `slice_tail()` — First or last n rows
+
+```{r}
+flights |> slice_head(n = 3) |> select(year, month, day)
+flights |> slice_tail(n = 3) |> select(year, month, day)
+```
+
+## `slice_sample()` — Random rows
+
+```{r}
+set.seed(42)
+
+# Without replacement (simple random sample — default)
+flights |>
+  slice_sample(n = 5, replace = FALSE) |>
+  select(month, day, carrier)
+
+# With replacement (bootstrap resample — needed for bootstrap!)
+flights |>
+  slice_sample(n = 5, replace = TRUE) |>
+  select(month, day, carrier)
+```
+
+## `distinct()` — Unique rows
+
+```{r}
+# All unique combinations of origin and dest
+flights |>
+  distinct(origin, dest) |>
+  slice_head(n = 5)
+
+# .keep_all = TRUE retains all other columns (first occurrence)
+flights |>
+  distinct(origin, dest, .keep_all = TRUE) |>
+  slice_head(n = 3) |>
+  select(origin, dest, carrier, month)
+```
+
+---
+
+# Part 2: `dplyr` — Column Verbs
+
+## `select()` — Keep or drop columns
+
+```{r}
+# By name
+flights |> select(year, month, day) |> slice_head(n = 3)
+
+# Range
+flights |> select(year:day) |> slice_head(n = 3)
+
+# Exclude
+flights |> select(!year:day) |> slice_head(n = 3)
+
+# By type
+flights |> select(where(is.character)) |> slice_head(n = 3)
+
+# Pattern matching
+flights |> select(starts_with("dep")) |> slice_head(n = 3)
+flights |> select(ends_with("delay")) |> slice_head(n = 3)
+flights |> select(contains("arr")) |> slice_head(n = 3)
+```
+
+## `rename()` — Rename a column (keeps all others)
+
+```{r}
+# new_name = old_name
+flights |>
+  rename(tail_num = tailnum) |>
+  select(tail_num, carrier) |>
+  slice_head(n = 3)
+```
+
+## `mutate()` — Add or modify columns
+
+```{r}
+# Add new columns (appear on the right by default)
+flights |>
+  mutate(
+    gain      = dep_delay - arr_delay,
+    speed_mph = distance / air_time * 60
+  ) |>
+  select(dep_delay, arr_delay, gain, speed_mph) |>
+  slice_head(n = 4)
+
+# .before and .after to control position
+flights |>
+  mutate(gain = dep_delay - arr_delay, .before = 1) |>
+  slice_head(n = 3) |>
+  select(1:5)
+
+# .keep = "used" — only show columns involved in the calculation
+flights |>
+  mutate(
+    gain  = dep_delay - arr_delay,
+    hours = air_time / 60,
+    .keep = "used"
+  ) |>
+  slice_head(n = 4)
+
+# Set column to NULL to delete it
+flights |>
+  mutate(year = NULL) |>
+  slice_head(n = 2) |>
+  select(1:5)
+```
+
+## `if_else()` — Vectorized conditional (handles NA safely)
+
+```{r}
+# if_else(condition, value_if_TRUE, value_if_FALSE)
+flights |>
+  mutate(
+    delay_status = if_else(dep_delay > 0, "Delayed", "On time")
+  ) |>
+  select(dep_delay, delay_status) |>
+  slice_head(n = 5)
+```
+
+## `relocate()` — Move columns
+
+```{r}
+# Default: brings to the front
+flights |>
+  relocate(time_hour, air_time) |>
+  slice_head(n = 2) |>
+  select(1:5)
+
+# .before / .after for precise control
+flights |>
+  relocate(starts_with("arr"), .before = dep_time) |>
+  slice_head(n = 2) |>
+  select(1:6)
+```
+
+---
+
+# Part 3: `dplyr` — Group Verbs
+
+## `group_by()` + `summarize()` — Group-level summaries
+
+```{r}
+# group_by() adds invisible grouping metadata
+# summarize() collapses each group to one row
+flights |>
+  group_by(month) |>
+  summarize(
+    avg_delay = mean(dep_delay, na.rm = TRUE),
+    n_flights  = n()
+  ) |>
+  slice_head(n = 4)
+```
+
+## `n()` — Count rows in current group
+
+```{r}
+# Only works inside summarize(), mutate(), filter() after group_by()
+flights |>
+  group_by(carrier) |>
+  summarize(total = n()) |>
+  arrange(desc(total)) |>
+  slice_head(n = 5)
+```
+
+## `count()` — Quick frequency table
+
+```{r}
+# Equivalent to group_by() |> summarize(n = n())
+flights |>
+  count(carrier, origin) |>
+  slice_head(n = 5)
+```
+
+## Multiple groups + `.groups` argument
+
+```{r}
+# When grouped by >1 variable, summarize() drops the LAST group
+# Use .groups = "drop_last" to suppress the warning
+flights |>
+  group_by(month, carrier) |>
+  summarize(avg_delay = mean(dep_delay, na.rm = TRUE),
+            .groups = "drop_last") |>
+  slice_head(n = 4)
+```
+
+## `ungroup()` — Remove grouping
+
+```{r}
+# After ungroup(), summarize() gives a single grand total
+flights |>
+  group_by(month) |>
+  ungroup() |>
+  summarize(grand_avg = mean(dep_delay, na.rm = TRUE))
+```
+
+## `.by =` inside `summarize()` — Alternative to `group_by()`
+
+```{r}
+# Equivalent result, but output is NOT a grouped tibble
+flights |>
+  summarize(
+    avg_delay = mean(dep_delay, na.rm = TRUE),
+    n = n(),
+    .by = c(origin, dest)
+  ) |>
+  slice_head(n = 4)
+```
+
+## `slice_max()` / `slice_min()` within groups
+
+```{r}
+# Most delayed flight per destination
+flights |>
+  group_by(dest) |>
+  slice_max(arr_delay, n = 1, with_ties = FALSE) |>
+  select(dest, arr_delay, carrier) |>
+  slice_head(n = 5)
+```
+
+---
+
+# Part 4: Tidy Data — `tidyr`
+
+## `pivot_longer()` — Wide → Long
+
+```{r}
+# billboard has columns wk1, wk2, ..., wk76
+# Each week column is actually a VALUE of the "week" variable
+billboard |>
+  pivot_longer(
+    cols         = starts_with("wk"),  # which columns to collapse
+    names_to     = "week",             # new column for old column names
+    values_to    = "rank",             # new column for cell values
+    values_drop_na = TRUE              # drop NA rows (songs that fell off)
+  ) |>
+  slice_head(n = 5)
+```
+
+## `parse_number()` — Extract number from a string
+
+```{r}
+# After pivoting, "week" is character "wk1", "wk2", etc.
+# parse_number() strips non-numeric characters
+billboard |>
+  pivot_longer(starts_with("wk"), names_to = "week", values_to = "rank",
+               values_drop_na = TRUE) |>
+  mutate(week = parse_number(week)) |>
+  slice_head(n = 4)
+```
+
+## `pivot_wider()` — Long → Wide
+
+```{r}
+# cms_patient_experience has 6 rows per organization (one per measure)
+# We want one row per organization with one column per measure
+cms_patient_experience |>
+  pivot_wider(
+    id_cols     = starts_with("org"),  # uniquely identifies each observation
+    names_from  = measure_cd,          # values of this column become new col names
+    values_from = prf_rate             # fill new columns with these values
+  ) |>
+  slice_head(n = 3)
+```
+
+---
+
+# Part 5: `ggplot2` — Building Plots Layer by Layer
+
+## The basic template
+
+```{r, fig.height=3}
+# Step 1: data only — empty canvas
+ggplot(data = diamonds)
+
+# Step 2: add aesthetics — axes appear
+ggplot(data = diamonds, mapping = aes(x = carat, y = price))
+```
+
+## Adding geoms
+
+```{r, fig.height=3}
+# geom_point() — scatter plot
+ggplot(diamonds, aes(x = carat, y = price)) +
+  geom_point(alpha = 0.1)   # alpha handles overplotting
+```
+
+## Plot-level vs. geom-level aesthetics
+
+```{r, fig.height=3}
+# color at PLOT level → inherited by BOTH geoms → 3 separate lines
+ggplot(diamonds, aes(x = carat, y = price, color = cut)) +
+  geom_point(alpha = 0.05) +
+  geom_smooth(method = "lm", se = FALSE)
+
+# color at GEOM level → only affects geom_point → 1 overall line
+ggplot(diamonds, aes(x = carat, y = price)) +
+  geom_point(aes(color = cut), alpha = 0.05) +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+## `labs()` — Labels
+
+```{r, fig.height=3}
+ggplot(diamonds, aes(x = carat, y = price)) +
+  geom_point(aes(color = cut), alpha = 0.1) +
+  labs(
+    title    = "Diamond price vs. carat weight",
+    subtitle = "Colored by cut quality",
+    x        = "Carat weight",
+    y        = "Price (USD)"
+  )
+```
+
+## EDA Plot Types by Variable Combination
+
+```{r, fig.height=3}
+# Numeric alone → histogram
+ggplot(diamonds, aes(x = carat)) +
+  geom_histogram(binwidth = 0.1)
+
+# Categorical alone → bar chart
+ggplot(diamonds, aes(x = cut)) +
+  geom_bar()
+
+# Numeric + Categorical → boxplot (use fct_reorder to sort by median)
+ggplot(diamonds, aes(x = fct_reorder(cut, price, median), y = price)) +
+  geom_boxplot()
+
+# Numeric + Numeric → scatter (use alpha for overplotting)
+ggplot(diamonds, aes(x = carat, y = price)) +
+  geom_point(alpha = 1/20)
+
+# Categorical + Categorical → geom_count
+ggplot(diamonds, aes(x = cut, y = color)) +
+  geom_count()
+```
+
+---
+
+# Part 6: Sampling in R
+
+## Deterministic sampling
+
+```{r}
+die <- tibble(face = 1:6)
+
+# By index — note row 3 appears twice (sampling WITH replacement manually)
+die |> slice(c(1, 3, 3, 6))
+```
+
+## `sample()` — Base R random sampling
+
+```{r}
+set.seed(42)
+
+# Without replacement (default) — just a permutation
+sample(1:6, size = 3, replace = FALSE)
+
+# With replacement — essential for bootstrap!
+sample(1:6, size = 6, replace = TRUE)
+```
+
+## `row_number()` — Add index column for systematic sampling
+
+```{r}
+die |>
+  mutate(row_index = row_number()) |>
+  relocate(row_index)
+```
+
+## `seq()` — For systematic sampling
+
+```{r}
+# Start randomly, then take every 2nd element
+start <- sample(1:2, size = 1)
+die |> slice(seq(start, n(), by = 2))
+```
+
+## `replicate()` — Repeat an experiment M times
+
+```{r}
+set.seed(42)
+M <- 1000
+
+# Each call draws a sample of size 10 from the die and computes the median
+# simplify = FALSE → returns a list; bind_rows() converts to tibble
+sampling_dist <- replicate(M,
+  die |>
+    slice_sample(n = 10, replace = TRUE) |>
+    summarize(med = median(face)),
+  simplify = FALSE
+) |>
+  bind_rows()
+
+# dim() of a replicate() result when simplify = TRUE (default for vectors):
+# rows = length of each result, cols = M
+# Here we used simplify = FALSE so we get a list → bind_rows gives a tibble
+dim(sampling_dist)  # M rows × 1 column (the "med" column)
+```
+
+## Understanding `dim()` with `replicate()`
+
+```{r}
+set.seed(42)
+
+# When each replicate returns a VECTOR of length k,
+# replicate(..., simplify = TRUE) gives a MATRIX: k rows × M cols
+mat <- replicate(5, sample(1:6, size = 3, replace = TRUE))
+dim(mat)  # 3 rows × 5 cols
+
+# Key exam pattern: replicate(M, sample(data)) where data has n elements
+# → matrix with n rows × M cols
+grades_exam1 <- c(68, 69, 71, 67, 78)
+boot_samps <- replicate(100, sample(grades_exam1))
+dim(boot_samps)  # 5 rows × 100 cols
+```
+
+---
+
+# Part 7: Bootstrap Confidence Intervals
+
+## The full bootstrap CI workflow
+
+```{r}
+set.seed(3080)
+
+# Original sample
+x <- c(68, 69, 71, 67, 78)
+n <- length(x)
+R <- 10000   # number of bootstrap resamples
+
+# --- Point estimate ---
+theta_hat <- mean(x)    # replace mean() with any estimator (median, IQR, etc.)
+cat("Point estimate:", theta_hat, "\n")
+
+# --- Generate bootstrap resamples and compute statistic for each ---
+boot_stats <- replicate(R,
+  mean(sample(x, size = n, replace = TRUE))  # MUST use replace = TRUE
+)
+
+# --- Method 1: Basic (Bias-Corrected) Bootstrap CI ---
+# Formula: (2*theta_hat - q_{1-a/2}, 2*theta_hat - q_{a/2})
+boot_errors  <- boot_stats - theta_hat
+sorted_errors <- sort(boot_errors)
+alpha <- 0.05
+
+lower_idx <- R * (1 - alpha/2)   # e.g., 9750
+upper_idx <- R * (alpha/2)       # e.g., 250
+
+basic_ci <- theta_hat - sorted_errors[c(lower_idx, upper_idx)]
+cat("Basic bootstrap 95% CI:", basic_ci, "\n")
+
+# --- Method 2: Percentile Bootstrap CI ---
+# Just take the alpha/2 and 1-alpha/2 quantiles of the bootstrap distribution
+pct_ci <- quantile(boot_stats, c(alpha/2, 1 - alpha/2))
+cat("Percentile bootstrap 95% CI:", pct_ci, "\n")
+```
+
+## Bootstrap bias estimate
+
+```{r}
+# Bias estimate = mean of bootstrap stats - original estimate
+bias_est <- mean(boot_stats) - theta_hat
+cat("Bootstrap bias estimate:", bias_est, "\n")
+
+# An unbiased-corrected estimator would be: theta_hat - bias_est
+```
+
+## Key conceptual checks
+
+```{r}
+# ✅ Correct bootstrap: replace = TRUE, size = n
+mean(sample(x, size = 5, replace = TRUE))
+
+# ❌ Wrong: replace = FALSE — always gives same values, no variability
+# mean(sample(x, size = 5, replace = FALSE))
+
+# ❌ Wrong: no size= argument — defaults to full permutation, no replacement
+# mean(sample(x))
+```
+
+---
+
+# Part 8: Randomization (Permutation) Tests
+
+## Two-sample randomization test — step by step
+
+```{r}
+set.seed(3080)
+
+# Hypothetical GPA data: did or did not submit SAT scores
+group_A <- c(3.75, 3.80, 4.00, 3.33)   # submitted SAT (nA = 4)
+group_B <- c(3.00, 2.67, 3.75)          # did not submit (nB = 3)
+
+nA <- length(group_A)
+nB <- length(group_B)
+n  <- nA + nB
+
+# Step 1: Observed test statistic
+t0 <- abs(mean(group_A) - mean(group_B))
+cat("Observed |diff in means|:", round(t0, 4), "\n")
+
+# Step 2-3: Generate B permutation resamples
+B <- 10000
+all_gpas <- c(group_A, group_B)  # pool everyone together
+
+perm_stats <- replicate(B, {
+  shuffled <- sample(all_gpas)           # randomly reassign labels
+  new_A    <- shuffled[1:nA]             # first nA go to "group A"
+  new_B    <- shuffled[(nA + 1):n]       # rest go to "group B"
+  abs(mean(new_A) - mean(new_B))         # compute test statistic
+})
+
+# Step 4: Permutation p-value (add 1 to numerator and denominator)
+p_value <- (sum(perm_stats >= t0) + 1) / (B + 1)
+cat("Permutation p-value:", round(p_value, 4), "\n")
+
+# Step 5: Visualize the permutation distribution
+tibble(T = perm_stats) |>
+  ggplot(aes(x = T)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  geom_vline(xintercept = t0, color = "red", linewidth = 1) +
+  labs(title = "Permutation distribution of |diff in means|",
+       subtitle = paste("Observed t0 =", round(t0, 3),
+                        " | p-value =", round(p_value, 3)),
+       x = "Test statistic", y = "Count")
+```
+
+---
+
+# Part 9: Monte Carlo — Estimating Type I Error
+
+## The core idea: each test outcome is a Bernoulli trial
+
+```{r}
+set.seed(3080)
+
+# Simulate Type I error rate for a z-test when data are NOT normal
+# True population: chi-squared with 2 df (mean = 2, sd = 2)
+# H0: mu = 2 (true!), so any rejection IS a Type I error
+
+n     <- 8       # small sample — CLT may not apply well
+alpha <- 0.05
+K     <- 10000   # Monte Carlo sample size
+sigma <- 2       # known population SD
+
+# Each replicate: draw sample, apply z-test, record reject/not reject
+I <- replicate(K, {
+  x    <- rchisq(n, df = 2)          # sample from true distribution
+  z    <- (mean(x) - 2) / (sigma / sqrt(n))  # z statistic
+  reject <- abs(z) > qnorm(1 - alpha/2)       # two-sided test
+  as.integer(reject)
+})
+
+# Empirical Type I error rate (should be ≈ alpha if CLT applies)
+I_bar <- mean(I)
+cat("Empirical Type I error rate:", round(I_bar, 4), "\n")
+cat("Nominal alpha:", alpha, "\n")
+
+# 99% CI for the true Type I error rate p
+alpha_star <- 0.01
+margin <- qnorm(1 - alpha_star/2) * sqrt(I_bar * (1 - I_bar) / K)
+cat("99% CI for p:", round(I_bar - margin, 4), "to", round(I_bar + margin, 4), "\n")
+```
+
+---
+
+# Quick Reference: Key Distinctions
+
+```{r, echo=FALSE}
+tribble(
+  ~Concept,                    ~Description,
+  "n (experimental)",          "Size of original sample; determines shape of sampling distribution",
+  "M or K (Monte Carlo)",      "# of simulation replicates; controls precision of the MC estimate",
+  "R (bootstrap resamples)",   "# of bootstrap draws; controls precision of bootstrap CI",
+  "replace = TRUE",            "REQUIRED for bootstrap; sampling WITH replacement",
+  "replace = FALSE",           "For simple random samples; each element can only appear once",
+  "Basic bootstrap CI",        "(2*theta_hat - q_high, 2*theta_hat - q_low) — bias-corrected",
+  "Percentile bootstrap CI",   "(q_low, q_high) of the bootstrap distribution — simpler",
+  "Bootstrap bias",            "mean(boot_stats) - theta_hat",
+  "Permutation p-value",       "(# resamples with T >= t0 + 1) / (B + 1)",
+  "LLN justifies...",          "Monte Carlo simulation AND bootstrap AND empirical distributions"
+) |>
+  knitr::kable(caption = "Key Concepts Cheat Sheet")
+```
